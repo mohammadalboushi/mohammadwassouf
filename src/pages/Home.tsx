@@ -33,7 +33,7 @@ export default function Home() {
               <span className="gold-text">محمد وسوف</span>
             </h1>
             <p className="text-xl text-[#a1a1aa] mb-2">
-              منصة تعليمية للموسيقى العربية والماقات
+              منصة تعليمية للموسيقى العربية والمقامات
             </p>
             <p className="text-[#71717a]">
               تعلم أسرار الموسيقى العربية من الأساس إلى الاحتراف
@@ -249,7 +249,7 @@ export default function Home() {
             </div>
           </div>
           <p className="text-[#71717a] text-sm">
-            منصة تعليمية شاملة للموسيقى العربية والماقات
+            منصة تعليمية شاملة للموسيقى العربية والمقامات
           </p>
           <p className="text-[#71717a] text-xs mt-4">
             © 2024 جميع الحقوق محفوظة
