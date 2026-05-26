@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Audio Mixer & AI Voice Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00f5ff;
+    --cyan-dim: #00c8d4;
+    --cyan-glow: rgba(0,245,255,0.18);
+    --purple: #bf5fff;
+    --purple-dim: #9b3de0;
+    --purple-glow: rgba(191,95,255,0.18);
+    --pink: #ff2d78;
+    --green: #00ff99;
+    --yellow: #ffe600;
+    --bg-base: #07080f;
+    --bg-panel: rgba(12,15,26,0.82);
+    --bg-card: rgba(18,22,40,0.75);
+    --bg-group: rgba(14,18,32,0.7);
+    --glass-border: rgba(0,245,255,0.13);
+    --glass-border-p: rgba(191,95,255,0.13);
+    --text-primary: #e8f4ff;
+    --text-secondary: rgba(200,215,240,0.62);
+    --text-dim: rgba(160,180,210,0.38);
+    --shadow-cyan: 0 0 18px rgba(0,245,255,0.22), 0 0 40px rgba(0,245,255,0.08);
+    --shadow-purple: 0 0 18px rgba(191,95,255,0.22), 0 0 40px rgba(191,95,255,0.08);
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%; 
+    background: var(--bg-base);
+    font-family: 'Cairo', sans-serif;
+    color: var(--text-primary);
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse 70% 55% at 20% 50%, rgba(0,245,255,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 50%, rgba(191,95,255,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 35% at 50% 10%, rgba(0,0,0,0.7) 0%, transparent 70%),
+      #07080f;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* للكمبيوتر */
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    flex: 0 0 auto;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(7,8,15,0.92);
+    backdrop-filter: blur(20px);
+    z-index: 99;
+  }
+  .topbar-logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topbar-logo .logo-icon {
+    width: 30px; height: 30px;
+    background: conic-gradient(from 180deg, var(--cyan), var(--purple), var(--cyan));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    animation: spin-logo 8s linear infinite;
+    box-shadow: 0 0 14px rgba(0,245,255,0.5);
+  }
+  @keyframes spin-logo { to { transform: rotate(360deg); } }
+  .topbar-logo .logo-icon svg { width:16px;height:16px; }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+  .logo-text span { color: var(--cyan); }
+  .topbar-center {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .status-dot.live { background: var(--pink); box-shadow: 0 0 8px var(--pink); animation: pulse-dot 1s ease-in-out infinite; }
+  .status-dot.ready { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .topbar-badge {
+    font-size: 10px; padding: 3px 9px; border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+  .topbar-badge.cyan { border-color: rgba(0,245,255,0.35); color: var(--cyan); }
+
+  /* ── MAIN LAYOUT ── */
+  .workspace {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 14px;
+    overflow: hidden;
+    padding: 14px 16px 12px;
+  }
+
+  /* ── LEFT PANEL ── */
+  .left-panel {
+    flex: 0 0 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .left-panel::-webkit-scrollbar { display: none; }
+
+  .glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.4;
+  }
+
+  .card-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+    color: var(--text-secondary); text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 6px var(--cyan);
+  }
+  .card-title .dot.p { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+
+  /* ── RECORD BUTTON ── */
+  .record-section {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .record-btn-wrap {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 120px; height: 120px;
+  }
+  .record-ring {
+    position: absolute; width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: conic-gradient(from 0deg, var(--cyan), var(--purple), var(--cyan)) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    animation: spin-ring 4s linear infinite;
+    opacity: 0.5;
+  }
+  .record-ring.outer {
+    width: 116px; height: 116px;
+    animation-duration: 6s;
+    animation-direction: reverse;
+    opacity: 0.25;
+  }
+  @keyframes spin-ring { to { transform: rotate(360deg); } }
+  .record-btn {
+    position: relative; z-index: 2;
+    width: 88px; height: 88px; border-radius: 50%;
+    border: none; cursor: pointer;
+    background: radial-gradient(circle at 35% 35%, rgba(0,245,255,0.25), rgba(7,8,15,0.9) 70%);
+    border: 1.5px solid rgba(0,245,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.25s;
+    box-shadow: 0 0 20px rgba(0,245,255,0.15), inset 0 0 20px rgba(0,0,0,0.4);
+  }
+  .record-btn:hover {
+    box-shadow: var(--shadow-cyan), inset 0 0 20px rgba(0,0,0,0.4);
+    border-color: var(--cyan);
+    transform: scale(1.04);
+  }
+  .record-btn.recording {
+    border-color: var(--pink);
+    background: radial-gradient(circle at 35% 35%, rgba(255,45,120,0.3), rgba(7,8,15,0.9) 70%);
+    box-shadow: 0 0 30px rgba(255,45,120,0.3), inset 0 0 20px rgba(0,0,0,0.4);
+    animation: record-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes record-pulse {
+    0%,100% { box-shadow: 0 0 20px rgba(255,45,120,0.3), inset 0 0 20px rgba(0,0,0,0.4); }
+    50% { box-shadow: 0 0 50px rgba(255,45,120,0.6), inset 0 0 20px rgba(0,0,0,0.4); }
+  }
+  .record-icon { width: 28px; height: 28px; transition: all 0.25s; }
+  .record-icon circle { fill: var(--pink); }
+  .record-icon.stop rect { fill: var(--pink); }
+
+  .timer-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px; font-weight: 700;
+    color: var(--cyan);
+    text-shadow: 0 0 20px rgba(0,245,255,0.5);
+    letter-spacing: 3px;
+  }
+  .record-label {
+    font-size: 11px; color: var(--text-secondary); letter-spacing: 0.5px;
+  }
+
+  /* ── OSCILLOSCOPE ── */
+  #oscilloscope {
+    width: 100%; height: 90px;
+    border-radius: var(--radius-sm);
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(0,245,255,0.1);
+    display: block;
+  }
+
+  /* ── PLAYBACK ── */
+  .playback-bar {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .pb-btn {
+    flex: 0 0 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; color: var(--text-primary);
+  }
+  .pb-btn:hover { border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,245,255,0.2); }
+  .pb-btn svg { width: 14px; height: 14px; fill: currentColor; }
+  .progress-wrap {
+    flex: 1; position: relative; height: 4px;
+    background: rgba(255,255,255,0.08); border-radius: 2px; cursor: pointer;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--cyan), var(--purple));
+    width: 0%;
+    transition: width 0.1s;
+    pointer-events: none;
+  }
+  .progress-thumb {
+    position: absolute; top: 50%; transform: translate(-50%,-50%);
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+    left: 0%;
+    pointer-events: none;
+    transition: left 0.1s;
+  }
+  .pb-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  /* ── EXPORT ── */
+  .export-btn {
+    width: 100%; padding: 11px 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,245,255,0.35);
+    background: linear-gradient(135deg, rgba(0,245,255,0.08), rgba(191,95,255,0.08));
+    color: var(--cyan); font-family: 'Cairo', sans-serif;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.25s;
+    letter-spacing: 0.3px;
+  }
+  .export-btn:hover {
+    background: linear-gradient(135deg, rgba(0,245,255,0.18), rgba(191,95,255,0.15));
+    box-shadow: var(--shadow-cyan);
+  }
+  .export-btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+  }
+  .export-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+  /* ── MONITOR LEVEL ── */
+  .level-meter {
+    display: flex; gap: 2px; align-items: flex-end; height: 36px;
+  }
+  .level-bar {
+    flex: 1; border-radius: 2px; min-height: 3px;
+    background: rgba(255,255,255,0.06);
+    transition: height 0.05s, background 0.1s;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,245,255,0.2) transparent;
+    padding-left: 2px;
+  }
+  .right-panel::-webkit-scrollbar { width: 4px; }
+  .right-panel::-webkit-scrollbar-track { background: transparent; }
+  .right-panel::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.2); border-radius: 2px; }
+
+  .dsp-matrix {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* ── DSP GROUP ── */
+  .dsp-group {
+    background: var(--bg-group);
+    border-radius: var(--radius);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .dsp-group:hover { border-color: rgba(0,245,255,0.22); }
+  .dsp-group.purple { border-color: var(--glass-border-p); }
+  .dsp-group.purple:hover { border-color: rgba(191,95,255,0.3); }
+  .dsp-group.green { border-color: rgba(0,255,153,0.12); }
+  .dsp-group.green:hover { border-color: rgba(0,255,153,0.25); }
+  .dsp-group.yellow { border-color: rgba(255,230,0,0.12); }
+  .dsp-group.yellow:hover { border-color: rgba(255,230,0,0.25); }
+  .dsp-group.pink { border-color: rgba(255,45,120,0.12); }
+  .dsp-group.pink:hover { border-color: rgba(255,45,120,0.25); }
+
+  .group-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: rgba(0,0,0,0.2);
+  }
+  .group-accent {
+    width: 3px; height: 22px; border-radius: 2px;
+    background: var(--cyan);
+    box-shadow: 0 0 10px var(--cyan);
+  }
+  .group-accent.purple { background: var(--purple); box-shadow: 0 0 10px var(--purple); }
+  .group-accent.green { background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .group-accent.yellow { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+  .group-accent.pink { background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+
+  .group-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-primary);
+  }
+  .group-title.cyan { color: var(--cyan); text-shadow: 0 0 12px rgba(0,245,255,0.4); }
+  .group-title.purple { color: var(--purple); text-shadow: 0 0 12px rgba(191,95,255,0.4); }
+  .group-title.green { color: var(--green); text-shadow: 0 0 12px rgba(0,255,153,0.4); }
+  .group-title.yellow { color: var(--yellow); text-shadow: 0 0 12px rgba(255,230,0,0.4); }
+  .group-title.pink { color: var(--pink); text-shadow: 0 0 12px rgba(255,45,120,0.4); }
+  .group-icon { margin-right: auto; font-size: 13px; opacity: 0.5; }
+
+  .group-nodes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0;
+  }
+
+  /* ── NODE ── */
+  .node {
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    border-left: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.2s;
+  }
+  .node:hover { background: rgba(0,245,255,0.025); }
+  .dsp-group.purple .node:hover { background: rgba(191,95,255,0.025); }
+  .node-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 9px;
+  }
+  .node-label {
+    font-size: 11px; font-weight: 600; color: var(--text-secondary);
+    letter-spacing: 0.3px;
+  }
+  .node-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--cyan);
+    min-width: 50px; text-align: left;
+    font-weight: 700;
+  }
+  .dsp-group.purple .node-value { color: var(--purple); }
+  .dsp-group.green .node-value { color: var(--green); }
+  .dsp-group.yellow .node-value { color: var(--yellow); }
+  .dsp-group.pink .node-value { color: var(--pink); }
+
+  /* ── SLIDERS ── */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; border-radius: 2px;
+    outline: none; cursor: pointer;
+    background: rgba(255,255,255,0.07);
+    position: relative;
+    touch-action: none; /* يمنع تحرك السلايدر بالغلط أثناء التمرير */
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan), 0 0 2px rgba(0,0,0,0.5);
+    border: 2px solid rgba(7,8,15,0.8);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+    box-shadow: 0 0 14px var(--cyan);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    border: 2px solid rgba(7,8,15,0.8);
+  }
+  .dsp-group.purple input[type="range"]::-webkit-slider-thumb { background: var(--purple); box-shadow: 0 0 8px var(--purple), 0 0 2px rgba(0,0,0,0.5); }
+  .dsp-group.purple input[type="range"]::-webkit-slider-thumb:hover { box-shadow: 0 0 14px var(--purple); }
+  .dsp-group.green input[type="range"]::-webkit-slider-thumb { background: var(--green); box-shadow: 0 0 8px var(--green), 0 0 2px rgba(0,0,0,0.5); }
+  .dsp-group.green input[type="range"]::-webkit-slider-thumb:hover { box-shadow: 0 0 14px var(--green); }
+  .dsp-group.yellow input[type="range"]::-webkit-slider-thumb { background: var(--yellow); box-shadow: 0 0 8px var(--yellow), 0 0 2px rgba(0,0,0,0.5); }
+  .dsp-group.yellow input[type="range"]::-webkit-slider-thumb:hover { box-shadow: 0 0 14px var(--yellow); }
+  .dsp-group.pink input[type="range"]::-webkit-slider-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 2px rgba(0,0,0,0.5); }
+  .dsp-group.pink input[type="range"]::-webkit-slider-thumb:hover { box-shadow: 0 0 14px var(--pink); }
+
+  .slider-track {
+    position: relative; display: flex; align-items: center;
+  }
+  .slider-fill {
+    position: absolute; height: 4px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--cyan), rgba(0,245,255,0.5));
+    pointer-events: none; z-index: 1;
+    left: 0; top: 50%; transform: translateY(-50%);
+  }
+  .dsp-group.purple .slider-fill { background: linear-gradient(90deg, var(--purple), rgba(191,95,255,0.5)); }
+  .dsp-group.green .slider-fill { background: linear-gradient(90deg, var(--green), rgba(0,255,153,0.5)); }
+  .dsp-group.yellow .slider-fill { background: linear-gradient(90deg, var(--yellow), rgba(255,230,0,0.5)); }
+  .dsp-group.pink .slider-fill { background: linear-gradient(90deg, var(--pink), rgba(255,45,120,0.5)); }
+
+  /* ── NOTIFICATION ── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: rgba(12,15,26,0.95);
+    border: 1px solid var(--cyan);
+    border-radius: 30px;
+    padding: 9px 22px;
+    font-size: 12px; font-weight: 600;
+    color: var(--cyan);
+    box-shadow: var(--shadow-cyan);
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── GRID LINE DECORATION ── */
+  .grid-line {
+    position: fixed; pointer-events: none; opacity: 0.025;
+    background: var(--cyan);
+  }
+  .grid-v { width: 1px; height: 100%; top: 0; }
+  .grid-h { height: 1px; width: 100%; left: 0; }
+
+  /* ── RESPONSIVE (MOBILE SUPPORT) ── */
+  @media (max-width: 900px) {
+    html, body {
+      height: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .workspace {
+      flex-direction: column;
+      overflow: visible;
+      padding: 10px;
+    }
+    .left-panel {
+      flex: 1 1 auto;
+      width: 100%;
+      overflow: visible;
+    }
+    .right-panel {
+      flex: 1 1 auto;
+      overflow: visible;
+    }
+    .grid-line {
+      display: none; /* إخفاء الخطوط الجمالية في الموبايل حتى لا تشوه التمرير */
+    }
+    .topbar {
+        padding: 0 15px;
+    }
+    .topbar-right {
+        display: none; /* إخفاء التفاصيل غير الهامة لتوفير المساحة */
+    }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="grid-line grid-v" style="left:33%"></div>
+<div class="grid-line grid-v" style="left:66%"></div>
+<div class="grid-line grid-h" style="top:50%"></div>
+
+<header class="topbar">
+  <div class="topbar-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="8" cy="8" r="5" stroke="white" stroke-width="1.5"/>
+        <circle cx="8" cy="8" r="2" fill="white"/>
+      </svg>
+    </div>
+    <span class="logo-text"><span>VOICE</span> MATRIX</span>
+  </div>
+  <div class="topbar-center">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">جاهز للتسجيل</span>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-badge">Web Audio API</span>
+    <span class="topbar-badge cyan">48kHz · Stereo</span>
+    <span class="topbar-badge">256kbps</span>
+  </div>
+</header>
+
+<main class="workspace">
+
+  <aside class="left-panel">
+
+    <div class="glass-card">
+      <div class="card-title"><div class="dot"></div>التحكم في التسجيل</div>
+      <div class="record-section">
+        <div class="record-btn-wrap">
+          <div class="record-ring"></div>
+          <div class="record-ring outer"></div>
+          <button class="record-btn" id="recordBtn" title="بدء التسجيل">
+            <svg class="record-icon" id="recordIcon" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="13"/>
+            </svg>
+          </button>
+        </div>
+        <div class="timer-display" id="timerDisplay">00:00</div>
+        <div class="record-label" id="recordLabel">اضغط للتسجيل</div>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <div class="card-title"><div class="dot"></div>مرئيات الموجة الحية</div>
+      <canvas id="oscilloscope"></canvas>
+      <div class="level-meter" id="levelMeter" style="margin-top:10px;">
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <div class="card-title"><div class="dot p"></div>تشغيل التسجيل</div>
+      <div class="playback-bar">
+        <button class="pb-btn" id="playBtn" title="تشغيل / إيقاف">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-fill" id="progressFill"></div>
+          <div class="progress-thumb" id="progressThumb"></div>
+        </div>
+        <span class="pb-time" id="pbTime">0:00 / 0:00</span>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <div class="card-title"><div class="dot"></div>تصدير الملف</div>
+      <button class="export-btn" id="exportBtn" disabled>
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        تنزيل التسجيل عالي الجودة
+      </button>
+    </div>
+
+  </aside>
+
+  <section class="right-panel">
+    <div class="dsp-matrix">
+
+      <div class="dsp-group">
+        <div class="group-header">
+          <div class="group-accent"></div>
+          <span class="group-title cyan">EQ & AIR</span>
+          <span class="group-icon">〰</span>
+          <span style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">الموازن الطيفي</span>
+        </div>
+        <div class="group-nodes">
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">High-Pass Filter</span>
+              <span class="node-value" id="val-hpf">80 Hz</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-hpf"></div>
+              <input type="range" id="hpf" min="20" max="800" value="80" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Low-Pass Filter</span>
+              <span class="node-value" id="val-lpf">18000 Hz</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-lpf"></div>
+              <input type="range" id="lpf" min="1000" max="20000" value="18000" step="100">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Bass Boost</span>
+              <span class="node-value" id="val-bass">0 dB</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-bass"></div>
+              <input type="range" id="bass" min="-12" max="12" value="0" step="0.5">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Mid Frequency</span>
+              <span class="node-value" id="val-mid">0 dB</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-mid"></div>
+              <input type="range" id="mid" min="-12" max="12" value="0" step="0.5">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Treble / Air</span>
+              <span class="node-value" id="val-treble">0 dB</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-treble"></div>
+              <input type="range" id="treble" min="-12" max="12" value="0" step="0.5">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dsp-group purple">
+        <div class="group-header">
+          <div class="group-accent purple"></div>
+          <span class="group-title purple">DYNAMICS</span>
+          <span class="group-icon">⧖</span>
+          <span style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">التحكم الديناميكي</span>
+        </div>
+        <div class="group-nodes">
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Noise Gate</span>
+              <span class="node-value" id="val-gate">-50 dB</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-gate"></div>
+              <input type="range" id="gate" min="-96" max="0" value="-50" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Comp. Threshold</span>
+              <span class="node-value" id="val-compThresh">-24 dB</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-compThresh"></div>
+              <input type="range" id="compThresh" min="-60" max="0" value="-24" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Comp. Ratio</span>
+              <span class="node-value" id="val-compRatio">4:1</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-compRatio"></div>
+              <input type="range" id="compRatio" min="1" max="20" value="4" step="0.5">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Monitor Gain (أسمع حالي)</span>
+              <span class="node-value" id="val-monGain">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-monGain"></div>
+              <input type="range" id="monGain" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Master Output</span>
+              <span class="node-value" id="val-master">80%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-master"></div>
+              <input type="range" id="master" min="0" max="100" value="80" step="1">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dsp-group green">
+        <div class="group-header">
+          <div class="group-accent green"></div>
+          <span class="group-title green">REVERB SPACE</span>
+          <span class="group-icon">◎</span>
+          <span style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">الصدى المكاني</span>
+        </div>
+        <div class="group-nodes">
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Room Reverb</span>
+              <span class="node-value" id="val-roomRev">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-roomRev"></div>
+              <input type="range" id="roomRev" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Hall Reverb</span>
+              <span class="node-value" id="val-hallRev">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-hallRev"></div>
+              <input type="range" id="hallRev" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Church Reverb</span>
+              <span class="node-value" id="val-churchRev">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-churchRev"></div>
+              <input type="range" id="churchRev" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Plate Reverb</span>
+              <span class="node-value" id="val-plateRev">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-plateRev"></div>
+              <input type="range" id="plateRev" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dsp-group yellow">
+        <div class="group-header">
+          <div class="group-accent yellow"></div>
+          <span class="group-title yellow">DELAY ENGINE</span>
+          <span class="group-icon">∿</span>
+          <span style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">محرك التأخير</span>
+        </div>
+        <div class="group-nodes">
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Echo Time</span>
+              <span class="node-value" id="val-delayTime">0.0s</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-delayTime"></div>
+              <input type="range" id="delayTime" min="0" max="1.0" value="0" step="0.01">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Feedback</span>
+              <span class="node-value" id="val-delayFB">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-delayFB"></div>
+              <input type="range" id="delayFB" min="0" max="90" value="0" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Delay Mix</span>
+              <span class="node-value" id="val-delayMix">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-delayMix"></div>
+              <input type="range" id="delayMix" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dsp-group pink">
+        <div class="group-header">
+          <div class="group-accent pink"></div>
+          <span class="group-title pink">SPECIAL FX</span>
+          <span class="group-icon">⚡</span>
+          <span style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">مؤثرات خاصة</span>
+        </div>
+        <div class="group-nodes">
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Distortion</span>
+              <span class="node-value" id="val-dist">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-dist"></div>
+              <input type="range" id="dist" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Stereo Pan</span>
+              <span class="node-value" id="val-pan">C</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-pan"></div>
+              <input type="range" id="pan" min="-1" max="1" value="0" step="0.01">
+            </div>
+          </div>
+          <div class="node">
+            <div class="node-header">
+              <span class="node-label">Chorus Rate</span>
+              <span class="node-value" id="val-chorus">0%</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" id="fill-chorus"></div>
+              <input type="range" id="chorus" min="0" max="100" value="0" step="1">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  VOICE MATRIX — Live Audio Mixer & AI Voice Studio
+//  Web Audio API DSP Engine — Vanilla JS
+// ═══════════════════════════════════════════════════════════════
+
+const $ = id => document.getElementById(id);
+
+// ── STATE ──────────────────────────────────────────────────────
+let audioCtx = null;
+let sourceNode = null;
+let analyserNode = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStream = null;
+let isRecording = false;
+let recordStart = null;
+let timerInterval = null;
+let recordedBlob = null;
+let audioPlayer = null;
+let animFrameId = null;
+let destNode = null; // MediaStreamDestinationNode
+
+// ── DSP NODES ──────────────────────────────────────────────────
+let hpfNode, lpfNode;
+let bassNode, midNode, trebleNode;
+let gateGainNode;
+let compressorNode;
+let monitorGainNode, masterGainNode;
+let delayNode, delayFeedbackGainNode, delayWetGainNode, delayDryGainNode;
+let distortionNode;
+let pannerNode;
+let chorusOscNode, chorusGainNode, chorusDelayNode;
+// Reverbs: convolver nodes per type
+let roomConvolver, hallConvolver, churchConvolver, plateConvolver;
+let roomWetGain, hallWetGain, churchWetGain, plateWetGain;
+let reverbDryGain;
+
+// ── INIT AUDIO CONTEXT & DSP GRAPH ─────────────────────────────
+async function initAudio() {
+  if (audioCtx) return;
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+
+  // Microphone with no processing
+  recordingStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: 2,
+      sampleRate: 48000
+    }
+  });
+
+  // ── BUILD DSP CHAIN ──
+  sourceNode = audioCtx.createMediaStreamSource(recordingStream);
+
+  // 1. HPF
+  hpfNode = audioCtx.createBiquadFilter();
+  hpfNode.type = 'highpass';
+  hpfNode.frequency.value = 80;
+  hpfNode.Q.value = 0.7;
+
+  // 2. LPF
+  lpfNode = audioCtx.createBiquadFilter();
+  lpfNode.type = 'lowpass';
+  lpfNode.frequency.value = 18000;
+  lpfNode.Q.value = 0.7;
+
+  // 3. Bass EQ (low shelf ~80Hz)
+  bassNode = audioCtx.createBiquadFilter();
+  bassNode.type = 'lowshelf';
+  bassNode.frequency.value = 200;
+  bassNode.gain.value = 0;
+
+  // 4. Mid EQ (~2kHz peaking)
+  midNode = audioCtx.createBiquadFilter();
+  midNode.type = 'peaking';
+  midNode.frequency.value = 2000;
+  midNode.Q.value = 1.0;
+  midNode.gain.value = 0;
+
+  // 5. Treble EQ (high shelf ~8kHz)
+  trebleNode = audioCtx.createBiquadFilter();
+  trebleNode.type = 'highshelf';
+  trebleNode.frequency.value = 8000;
+  trebleNode.gain.value = 0;
+
+  // 6. Noise Gate (simple gain based threshold)
+  gateGainNode = audioCtx.createGain();
+  gateGainNode.gain.value = 1;
+
+  // 7. Compressor
+  compressorNode = audioCtx.createDynamicsCompressor();
+  compressorNode.threshold.value = -24;
+  compressorNode.knee.value = 10;
+  compressorNode.ratio.value = 4;
+  compressorNode.attack.value = 0.003;
+  compressorNode.release.value = 0.25;
+
+  // 8. Monitor Gain (for monitoring only, pre-master)
+  monitorGainNode = audioCtx.createGain();
+  monitorGainNode.gain.value = 0; // تم التصفير هنا لمنع رجع الصوت تلقائياً
+
+  // 9. Distortion (waveshaper)
+  distortionNode = audioCtx.createWaveShaper();
+  distortionNode.curve = makeDistortionCurve(0);
+  distortionNode.oversample = '4x';
+
+  // 10. Panner (stereo)
+  pannerNode = audioCtx.createStereoPanner();
+  pannerNode.pan.value = 0;
+
+  // 11. Delay
+  delayNode = audioCtx.createDelay(2.0);
+  delayNode.delayTime.value = 0;
+  delayFeedbackGainNode = audioCtx.createGain();
+  delayFeedbackGainNode.gain.value = 0;
+  delayWetGainNode = audioCtx.createGain();
+  delayWetGainNode.gain.value = 0;
+  delayDryGainNode = audioCtx.createGain();
+  delayDryGainNode.gain.value = 1;
+
+  // 12. Reverbs (convolver)
+  roomConvolver = audioCtx.createConvolver();
+  hallConvolver = audioCtx.createConvolver();
+  churchConvolver = audioCtx.createConvolver();
+  plateConvolver = audioCtx.createConvolver();
+
+  roomConvolver.buffer = makeImpulseResponse(audioCtx, 0.4, 0.8);
+  hallConvolver.buffer = makeImpulseResponse(audioCtx, 1.8, 2.5);
+  churchConvolver.buffer = makeImpulseResponse(audioCtx, 3.0, 4.5);
+  plateConvolver.buffer = makeImpulseResponse(audioCtx, 1.2, 1.8, true);
+
+  roomWetGain = audioCtx.createGain(); roomWetGain.gain.value = 0;
+  hallWetGain = audioCtx.createGain(); hallWetGain.gain.value = 0;
+  churchWetGain = audioCtx.createGain(); churchWetGain.gain.value = 0;
+  plateWetGain = audioCtx.createGain(); plateWetGain.gain.value = 0;
+  reverbDryGain = audioCtx.createGain(); reverbDryGain.gain.value = 1;
+
+  // 13. Chorus
+  chorusDelayNode = audioCtx.createDelay(0.1);
+  chorusDelayNode.delayTime.value = 0.025;
+  chorusOscNode = audioCtx.createOscillator();
+  chorusOscNode.type = 'sine';
+  chorusOscNode.frequency.value = 0.5;
+  chorusGainNode = audioCtx.createGain();
+  chorusGainNode.gain.value = 0;
+  chorusOscNode.connect(chorusGainNode);
+  chorusGainNode.connect(chorusDelayNode.delayTime);
+  chorusOscNode.start();
+
+  // 14. Analyser (for visualizer) — after EQ, before output
+  analyserNode = audioCtx.createAnalyser();
+  analyserNode.fftSize = 2048;
+  analyserNode.smoothingTimeConstant = 0.82;
+
+  // 15. Master Output Gain
+  masterGainNode = audioCtx.createGain();
+  masterGainNode.gain.value = 0.8;
+
+  // 16. Destination for MediaRecorder
+  destNode = audioCtx.createMediaStreamDestination();
+
+  // ── ROUTING ──
+  // Source → HPF → LPF → Bass → Mid → Treble → Gate → Compressor → Distortion → Pan →
+  // [Delay wet/dry] → [Reverb wet/dry] → [Chorus] → Analyser → Master → destination + speakers
+
+  // حساس عزل الضجيج (يجب أن يقرأ من المايك مباشرة حتى لا يعلق في حالة الصمت)
+  window.gateAnalyserNode = audioCtx.createAnalyser();
+  window.gateAnalyserNode.fftSize = 512;
+  sourceNode.connect(window.gateAnalyserNode);
+
+  sourceNode.connect(hpfNode);
+  hpfNode.connect(lpfNode);
+  lpfNode.connect(bassNode);
+  bassNode.connect(midNode);
+  midNode.connect(trebleNode);
+  trebleNode.connect(gateGainNode);
+  gateGainNode.connect(compressorNode);
+  compressorNode.connect(distortionNode);
+  distortionNode.connect(pannerNode);
+
+  // Delay send/return
+  pannerNode.connect(delayDryGainNode);
+  pannerNode.connect(delayNode);
+  delayNode.connect(delayFeedbackGainNode);
+  delayFeedbackGainNode.connect(delayNode); // feedback loop
+  delayNode.connect(delayWetGainNode);
+
+  // Merge delay dry + wet
+  const delayMerger = audioCtx.createGain();
+  delayDryGainNode.connect(delayMerger);
+  delayWetGainNode.connect(delayMerger);
+
+  // Reverb parallel sends from delayMerger
+  delayMerger.connect(reverbDryGain);
+  delayMerger.connect(roomConvolver);
+  delayMerger.connect(hallConvolver);
+  delayMerger.connect(churchConvolver);
+  delayMerger.connect(plateConvolver);
+
+  roomConvolver.connect(roomWetGain);
+  hallConvolver.connect(hallWetGain);
+  churchConvolver.connect(churchWetGain);
+  plateConvolver.connect(plateWetGain);
+
+  // Merge reverb dry + all wet
+  const reverbMerger = audioCtx.createGain();
+  reverbDryGain.connect(reverbMerger);
+  roomWetGain.connect(reverbMerger);
+  hallWetGain.connect(reverbMerger);
+  churchWetGain.connect(reverbMerger);
+  plateWetGain.connect(reverbMerger);
+
+  // Chorus (parallel)
+  reverbMerger.connect(chorusDelayNode);
+  const chorusMerger = audioCtx.createGain();
+  reverbMerger.connect(chorusMerger);
+  chorusDelayNode.connect(chorusMerger);
+
+  // Analyser + Monitor + Master + Destination
+  chorusMerger.connect(analyserNode);
+  
+  // 1. الصوت المعالج يذهب للمكسب الرئيسي (الماستر) أولاً
+  analyserNode.connect(masterGainNode);
+  
+  // 2. الماستر يذهب مباشرة للتسجيل (عشان يتسجل دائماً سواء سمعت حالك أو لا)
+  masterGainNode.connect(destNode);
+  
+  // 3. الماستر يذهب أيضاً لزر المراقبة، ومنه للسماعات فقط
+  masterGainNode.connect(monitorGainNode);
+  monitorGainNode.connect(audioCtx.destination);
+
+  // ── START MEDIA RECORDER on the PROCESSED stream ──
+  const options = { audioBitsPerSecond: 256000 };
+  if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+    options.mimeType = 'audio/webm;codecs=opus';
+  } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+    options.mimeType = 'audio/webm';
+  } else {
+    options.mimeType = ''; // ترك المتصفح يختار الصيغة الأنسب للجوال تلقائياً
+  }
+  
+  // تشغيل المسجل بالصيغة المدعومة 100%
+  mediaRecorder = new MediaRecorder(destNode.stream, options.mimeType ? options : undefined);
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = onRecordingStop;
+
+  // Setup analyser visualization
+  startVisualizer();
+
+  // Noise gate animation loop
+  startNoiseGate();
+
+  setStatus('ready');
+}
+
+// ── IMPULSE RESPONSE GENERATOR ──────────────────────────────────
+function makeImpulseResponse(ctx, duration, decay, plate = false) {
+  const sampleRate = ctx.sampleRate;
+  const length = sampleRate * duration;
+  const impulse = ctx.createBuffer(2, length, sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const channel = impulse.getChannelData(c);
+    for (let i = 0; i < length; i++) {
+      let v = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      if (plate) {
+        // Plate: denser early reflections
+        v += (Math.random() * 2 - 1) * 0.3 * Math.pow(1 - i / (length * 0.1), 8);
+      }
+      channel[i] = v;
+    }
+  }
+  return impulse;
+}
+
+// ── DISTORTION CURVE ────────────────────────────────────────────
+function makeDistortionCurve(amount) {
+  const n = 256;
+  const curve = new Float32Array(n);
+  const k = amount === 0 ? 0.001 : amount * 4;
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = ((Math.PI + k) * x) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
+// ── VISUALIZER ──────────────────────────────────────────────────
+function startVisualizer() {
+  const canvas = $('oscilloscope');
+  const ctx = canvas.getContext('2d');
+
+  // Setup level meter bars
+  const meter = $('levelMeter');
+  meter.innerHTML = '';
+  const barCount = 32;
+  const bars = [];
+  for (let i = 0; i < barCount; i++) {
+    const b = document.createElement('div');
+    b.className = 'level-bar';
+    meter.appendChild(b);
+    bars.push(b);
+  }
+
+  const bufLen = analyserNode.frequencyBinCount;
+  const timeData = new Uint8Array(bufLen);
+  const freqData = new Uint8Array(bufLen);
+
+  function draw() {
+    animFrameId = requestAnimationFrame(draw);
+
+    // Resize canvas
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+
+    analyserNode.getByteTimeDomainData(timeData);
+    analyserNode.getByteFrequencyData(freqData);
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw waveform
+    ctx.beginPath();
+    ctx.lineWidth = 1.5;
+
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, 'rgba(0,245,255,0.2)');
+    grad.addColorStop(0.5, '#00f5ff');
+    grad.addColorStop(1, 'rgba(191,95,255,0.5)');
+    ctx.strokeStyle = grad;
+
+    const sliceW = W / bufLen;
+    let x = 0;
+    for (let i = 0; i < bufLen; i++) {
+      const v = timeData[i] / 128.0;
+      const y = (v * H) / 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+      x += sliceW;
+    }
+    ctx.stroke();
+
+    // Glow shadow
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#00f5ff';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Level meter (freq data)
+    const step = Math.floor(freqData.length / barCount);
+    for (let i = 0; i < barCount; i++) {
+      let sum = 0;
+      for (let j = 0; j < step; j++) sum += freqData[i * step + j];
+      const avg = sum / step / 255;
+      const pct = avg * 100;
+      const h = Math.max(3, pct * 0.36); // max 36px
+      bars[i].style.height = h + 'px';
+      const hue = isRecording
+        ? `hsl(${300 + i * 3}, 100%, 65%)`
+        : `hsl(${180 + i * 3}, 100%, 65%)`;
+      bars[i].style.background = hue;
+      bars[i].style.boxShadow = avg > 0.3 ? `0 0 6px ${hue}` : 'none';
+    }
+  }
+
+  draw();
+}
+
+// ── NOISE GATE ENGINE ───────────────────────────────────────────
+function startNoiseGate() {
+  if (!window.gateAnalyserNode) return;
+  const timeData = new Uint8Array(window.gateAnalyserNode.frequencyBinCount);
+  const gateThreshold = () => {
+    const dB = parseFloat($('gate').value);
+    if (dB <= -95) return 0; // إذا كان السلايدر على الصفر، نلغي العزل تماماً
+    // Convert dB to linear amplitude [0..1]
+    return Math.pow(10, dB / 20);
+  };
+
+  function gateLoop() {
+    requestAnimationFrame(gateLoop);
+    if (!gateGainNode) return;
+    window.gateAnalyserNode.getByteTimeDomainData(timeData);
+    let maxAmp = 0;
+    for (let i = 0; i < timeData.length; i++) {
+      maxAmp = Math.max(maxAmp, Math.abs(timeData[i] - 128) / 128);
+    }
+    const thresh = gateThreshold();
+    const target = maxAmp >= thresh ? 1 : 0;
+    // Smooth transition
+    const current = gateGainNode.gain.value;
+    gateGainNode.gain.value = current + (target - current) * 0.15;
+  }
+  gateLoop();
+}
+
+// ── RECORD CONTROLS ─────────────────────────────────────────────
+$('recordBtn').addEventListener('click', async () => {
+  if (!audioCtx) {
+    await initAudio();
+  }
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  if (!isRecording) {
+    startRecording();
+  } else {
+    stopRecording();
+  }
+});
+
+function startRecording() {
+  recordedChunks = [];
+  recordedBlob = null;
+  $('exportBtn').disabled = true;
+  $('recordBtn').classList.add('recording');
+
+  // Swap icon to stop (square)
+  $('recordIcon').innerHTML = '<rect x="10" y="10" width="20" height="20" rx="3"/>';
+  $('recordIcon').classList.add('stop');
+
+  mediaRecorder.start(100);
+  isRecording = true;
+  recordStart = Date.now();
+
+  timerInterval = setInterval(updateTimer, 500);
+  setStatus('live');
+  $('recordLabel').textContent = 'جارٍ التسجيل...';
+  showToast('🔴 التسجيل نشط — جودة عالية 48kHz');
+}
+
+function stopRecording() {
+  mediaRecorder.stop();
+  isRecording = false;
+  clearInterval(timerInterval);
+
+  $('recordBtn').classList.remove('recording');
+  $('recordIcon').innerHTML = '<circle cx="20" cy="20" r="13"/>';
+  $('recordIcon').classList.remove('stop');
+  $('recordLabel').textContent = 'اضغط للتسجيل';
+  setStatus('ready');
+  showToast('✅ اكتمل التسجيل');
+}
+
+function onRecordingStop() {
+  // الحل السحري للأندرويد: أخذ صيغة الملف الحقيقية من المتصفح لتجنب كتم الصوت
+  const mime = mediaRecorder.mimeType ? mediaRecorder.mimeType : 'audio/webm';
+  recordedBlob = new Blob(recordedChunks, { type: mime });
+  setupPlayback(recordedBlob);
+  $('exportBtn').disabled = false;
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - recordStart) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  $('timerDisplay').textContent = `${mm}:${ss}`;
+}
+
+// ── PLAYBACK ────────────────────────────────────────────────────
+function setupPlayback(blob) {
+  if (audioPlayer) { audioPlayer.pause(); audioPlayer = null; }
+  const url = URL.createObjectURL(blob);
+  audioPlayer = new Audio(url);
+
+  audioPlayer.addEventListener('timeupdate', () => {
+    const pct = (audioPlayer.currentTime / audioPlayer.duration) * 100 || 0;
+    $('progressFill').style.width = pct + '%';
+    $('progressThumb').style.left = pct + '%';
+    $('pbTime').textContent = `${fmtTime(audioPlayer.currentTime)} / ${fmtTime(audioPlayer.duration)}`;
+  });
+
+  audioPlayer.addEventListener('ended', () => {
+    $('playBtn').innerHTML = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  });
+}
+
+$('playBtn').addEventListener('click', () => {
+  if (!audioPlayer) return;
+  if (audioPlayer.paused) {
+    audioPlayer.play();
+    $('playBtn').innerHTML = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+  } else {
+    audioPlayer.pause();
+    $('playBtn').innerHTML = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  }
+});
+
+$('progressWrap').addEventListener('click', e => {
+  if (!audioPlayer || !audioPlayer.duration) return;
+  const rect = $('progressWrap').getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audioPlayer.currentTime = pct * audioPlayer.duration;
+});
+
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+// ── EXPORT ──────────────────────────────────────────────────────
+$('exportBtn').addEventListener('click', () => {
+  if (!recordedBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(recordedBlob);
+  a.download = `voice-matrix-${Date.now()}.webm`;
+  a.click();
+  showToast('⬇ جاري التنزيل...');
+});
+
+// ── DSP SLIDER ROUTING ──────────────────────────────────────────
+function updateSliderFill(sliderId, fillId, min, max) {
+  const slider = $(sliderId);
+  const fill = $(fillId);
+  const pct = ((slider.value - min) / (max - min)) * 100;
+  fill.style.width = pct + '%';
+}
+
+function bindSlider(id, fillId, min, max, handler, formatter) {
+  const slider = $(id);
+  const valEl = $('val-' + id);
+
+  function update() {
+    const v = parseFloat(slider.value);
+    valEl.textContent = formatter(v);
+    updateSliderFill(id, fillId, min, max);
+    if (audioCtx && handler) handler(v);
+  }
+
+  slider.addEventListener('input', update);
+  // Initialize fill
+  updateSliderFill(id, fillId, min, max);
+}
+
+// ── BIND ALL SLIDERS ────────────────────────────────────────────
+
+// HPF
+bindSlider('hpf', 'fill-hpf', 20, 800, v => hpfNode && (hpfNode.frequency.value = v), v => v + ' Hz');
+
+// LPF
+bindSlider('lpf', 'fill-lpf', 1000, 20000, v => lpfNode && (lpfNode.frequency.value = v), v => v + ' Hz');
+
+// Bass
+bindSlider('bass', 'fill-bass', -12, 12, v => bassNode && (bassNode.gain.value = v), v => (v >= 0 ? '+' : '') + v + ' dB');
+
+// Mid
+bindSlider('mid', 'fill-mid', -12, 12, v => midNode && (midNode.gain.value = v), v => (v >= 0 ? '+' : '') + v + ' dB');
+
+// Treble
+bindSlider('treble', 'fill-treble', -12, 12, v => trebleNode && (trebleNode.gain.value = v), v => (v >= 0 ? '+' : '') + v + ' dB');
+
+// Gate
+bindSlider('gate', 'fill-gate', -96, 0, null, v => v + ' dB');
+
+// Compressor Threshold
+bindSlider('compThresh', 'fill-compThresh', -60, 0, v => compressorNode && (compressorNode.threshold.value = v), v => v + ' dB');
+
+// Compressor Ratio
+bindSlider('compRatio', 'fill-compRatio', 1, 20, v => compressorNode && (compressorNode.ratio.value = v), v => v + ':1');
+
+// Monitor Gain
+bindSlider('monGain', 'fill-monGain', 0, 100, v => monitorGainNode && (monitorGainNode.gain.value = v / 100), v => v + '%');
+
+// Master Output
+bindSlider('master', 'fill-master', 0, 100, v => masterGainNode && (masterGainNode.gain.value = v / 100), v => v + '%');
+
+// Room Reverb
+bindSlider('roomRev', 'fill-roomRev', 0, 100, v => roomWetGain && (roomWetGain.gain.value = (v / 100) * 3), v => v + '%');
+
+// Hall Reverb
+bindSlider('hallRev', 'fill-hallRev', 0, 100, v => hallWetGain && (hallWetGain.gain.value = (v / 100) * 3), v => v + '%');
+
+// Church Reverb
+bindSlider('churchRev', 'fill-churchRev', 0, 100, v => churchWetGain && (churchWetGain.gain.value = (v / 100) * 3.5), v => v + '%');
+
+// Plate Reverb
+bindSlider('plateRev', 'fill-plateRev', 0, 100, v => plateWetGain && (plateWetGain.gain.value = (v / 100) * 3), v => v + '%');
+
+// Delay Time
+bindSlider('delayTime', 'fill-delayTime', 0, 1.0, v => delayNode && (delayNode.delayTime.value = v), v => v.toFixed(2) + 's');
+
+// Delay Feedback
+bindSlider('delayFB', 'fill-delayFB', 0, 90, v => delayFeedbackGainNode && (delayFeedbackGainNode.gain.value = v / 100), v => v + '%');
+
+// Delay Mix
+bindSlider('delayMix', 'fill-delayMix', 0, 100, v => {
+  if (!delayWetGainNode) return;
+  delayWetGainNode.gain.value = (v / 100) * 1.5; // رفع قوة صوت التكرار
+  delayDryGainNode.gain.value = 1; // المحافظة على قوة الصوت الأصلي ليبقى واضح
+}, v => v + '%');
+
+// Distortion
+bindSlider('dist', 'fill-dist', 0, 100, v => distortionNode && (distortionNode.curve = makeDistortionCurve(v / 100)), v => v + '%');
+
+// Stereo Pan
+bindSlider('pan', 'fill-pan', -1, 1, v => pannerNode && (pannerNode.pan.value = v), v => {
+  if (Math.abs(v) < 0.03) return 'C';
+  return v > 0 ? 'R' + Math.round(v * 100) : 'L' + Math.round(Math.abs(v) * 100);
+});
+
+// Chorus
+bindSlider('chorus', 'fill-chorus', 0, 100, v => {
+  if (!chorusGainNode || !chorusOscNode) return;
+  chorusGainNode.gain.value = (v / 100) * 0.008;
+  chorusOscNode.frequency.value = 0.2 + (v / 100) * 4;
+}, v => v + '%');
+
+// ── STATUS ──────────────────────────────────────────────────────
+function setStatus(state) {
+  const dot = $('statusDot');
+  const txt = $('statusText');
+  dot.className = 'status-dot';
+  if (state === 'live') { dot.classList.add('live'); txt.textContent = 'تسجيل نشط'; }
+  else if (state === 'ready') { dot.classList.add('ready'); txt.textContent = 'جاهز'; }
+  else { txt.textContent = 'غير مهيأ'; }
+}
+
+// ── TOAST ────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── INIT FILLS ON LOAD ───────────────────────────────────────────
+const sliderDefs = [
+  ['hpf','fill-hpf',20,800],
+  ['lpf','fill-lpf',1000,20000],
+  ['bass','fill-bass',-12,12],
+  ['mid','fill-mid',-12,12],
+  ['treble','fill-treble',-12,12],
+  ['gate','fill-gate',-96,0],
+  ['compThresh','fill-compThresh',-60,0],
+  ['compRatio','fill-compRatio',1,20],
+  ['monGain','fill-monGain',0,100],
+  ['master','fill-master',0,100],
+  ['roomRev','fill-roomRev',0,100],
+  ['hallRev','fill-hallRev',0,100],
+  ['churchRev','fill-churchRev',0,100],
+  ['plateRev','fill-plateRev',0,100],
+  ['delayTime','fill-delayTime',0,1.0],
+  ['delayFB','fill-delayFB',0,90],
+  ['delayMix','fill-delayMix',0,100],
+  ['dist','fill-dist',0,100],
+  ['pan','fill-pan',-1,1],
+  ['chorus','fill-chorus',0,100],
+];
+sliderDefs.forEach(([id, fillId, min, max]) => updateSliderFill(id, fillId, min, max));
+
+// ── IDLE VISUALIZER (before mic init) ────────────────────────────
+(function idleViz() {
+  const canvas = $('oscilloscope');
+  const ctx = canvas.getContext('2d');
+  let t = 0;
+  function draw() {
+    if (analyserNode) return; // Hand off to real visualizer
+    requestAnimationFrame(draw);
+    const W = canvas.offsetWidth || 280;
+    const H = canvas.offsetHeight || 90;
+    canvas.width = W; canvas.height = H;
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath();
+    ctx.lineWidth = 1.5;
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, 'rgba(0,245,255,0.1)');
+    grad.addColorStop(0.5, 'rgba(0,245,255,0.25)');
+    grad.addColorStop(1, 'rgba(191,95,255,0.1)');
+    ctx.strokeStyle = grad;
+    for (let x = 0; x < W; x++) {
+      const y = H / 2 + Math.sin((x / W) * 8 * Math.PI + t) * 4 * Math.sin(t * 0.5);
+      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    t += 0.02;
+  }
+  draw();
+})();
+
+</script>
+</body>
+</html>
